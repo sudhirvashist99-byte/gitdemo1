@@ -2,38 +2,43 @@ import os
 import json
 from paddleocr import PaddleOCR
 
-INPUT_DIR = "/data/images"
-OUTPUT_DIR = "/data/output_json"
+IMAGE_ROOT = "/mydata/work_images"
+OUTPUT_ROOT = "/mydata/output_json"
 
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+ocr = PaddleOCR(lang="en", use_gpu=False)
 
-ocr = PaddleOCR(lang="en", cls=False)
+os.makedirs(OUTPUT_ROOT, exist_ok=True)
 
-for img in sorted(os.listdir(INPUT_DIR)):
-    if not img.lower().endswith((".png", ".jpg", ".jpeg")):
+for doc in os.listdir(IMAGE_ROOT):
+    doc_path = os.path.join(IMAGE_ROOT, doc)
+    if not os.path.isdir(doc_path):
         continue
 
-    img_path = os.path.join(INPUT_DIR, img)
-    result = ocr.ocr(img_path)
+    out_doc = os.path.join(OUTPUT_ROOT, doc)
+    os.makedirs(out_doc, exist_ok=True)
 
-    output = {
-        "image": img,
-        "text_blocks": []
-    }
+    for img in sorted(os.listdir(doc_path)):
+        if not img.endswith(".png"):
+            continue
 
-    for line in result[0]:
-        output["text_blocks"].append({
-            "text": line[1][0],
-            "confidence": float(line[1][1]),
-            "box": line[0]
-        })
+        img_path = os.path.join(doc_path, img)
+        result = ocr.ocr(img_path, cls=False)
 
-    out_file = os.path.join(
-        OUTPUT_DIR,
-        img.rsplit(".", 1)[0] + ".json"
-    )
+        page_json = {
+            "image": img,
+            "lines": []
+        }
 
-    with open(out_file, "w", encoding="utf-8") as f:
-        json.dump(output, f, indent=2, ensure_ascii=False)
+        if result and result[0]:
+            for line in result[0]:
+                page_json["lines"].append({
+                    "text": line[1][0],
+                    "confidence": float(line[1][1]),
+                    "box": line[0]
+                })
 
-    print(f"OCR done → {out_file}")
+        with open(os.path.join(out_doc, img.replace(".png", ".json")), "w") as f:
+            json.dump(page_json, f, indent=2)
+
+print("OCR → JSON completed")
+
